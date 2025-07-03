@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Interactivo con IA: AT1 - Unidades 4, 5 y 6</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF5; /* Blanco crema */
+        }
+        .btn-option {
+            transition: background-color 0.3s, border-color 0.3s, transform 0.1s;
+        }
+        .btn-option:active {
+            transform: scale(0.98);
+        }
+        .correct {
+            background-color: #D1FAE5 !important; /* Verde claro */
+            border-color: #10B981 !important; /* Verde oscuro */
+            color: #064E3B;
+        }
+        .incorrect {
+            background-color: #FEE2E2 !important; /* Rojo claro */
+            border-color: #EF4444 !important; /* Rojo oscuro */
+            color: #991B1B;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-gray-800 flex items-center justify-center min-h-screen p-4">
+
+    <div id="quiz-container" class="w-full max-w-3xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
+        
+        <div id="quiz-header" class="mb-6">
+            <h1 class="text-2xl sm:text-3xl font-bold text-center text-gray-900">Quiz de Repaso AT1</h1>
+            <p class="text-center text-gray-500 mt-1">Unidades 4, 5 y 6 (con IA ✨)</p>
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div id="question-area">
+            <h2 id="question-text" class="text-xl font-semibold mb-6 text-gray-800"></h2>
+            <div id="options-container" class="space-y-3"></div>
+        </div>
+
+        <div id="feedback-area" class="mt-6 hidden">
+            <div id="justification" class="bg-blue-50 border-l-4 border-blue-500 text-blue-800 p-4 rounded-r-lg">
+                <h4 class="font-bold">Fundamentación:</h4>
+                <p id="justification-text"></p>
+            </div>
+            <div class="mt-4">
+                 <button id="explain-more-btn" class="w-full bg-indigo-100 text-indigo-700 font-semibold py-2 px-4 rounded-lg hover:bg-indigo-200 transition-colors">✨ Explicar Más</button>
+            </div>
+            <div class="mt-4 p-4 bg-gray-50 rounded-lg">
+                <label for="user-justification" class="block text-sm font-medium text-gray-700">¿Por qué no es correcta la opción X?</label>
+                <textarea id="user-justification" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="Escribe aquí tu análisis..."></textarea>
+            </div>
+        </div>
+
+        <div id="navigation-area" class="mt-8 text-center">
+             <button id="next-btn" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-colors hidden">Siguiente Pregunta</button>
+        </div>
+
+        <div id="score-area" class="hidden text-center">
+            <h2 class="text-3xl font-bold text-gray-900">¡Quiz Finalizado!</h2>
+            <p class="text-5xl font-bold my-4 text-blue-600" id="final-score"></p>
+            <p class="text-gray-600" id="score-feedback"></p>
+            <div class="mt-8 space-y-3 sm:space-y-0 sm:space-x-3">
+                 <button id="generate-question-btn" class="bg-purple-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors">✨ Generar Nueva Pregunta</button>
+                 <button id="restart-btn" class="bg-gray-800 text-white font-bold py-3 px-6 rounded-lg hover:bg-gray-900 transition-colors">Volver a Intentar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Gemini -->
+    <div id="gemini-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-2xl shadow-xl p-6 sm:p-8 w-full max-w-2xl relative transform transition-all scale-95 opacity-0" id="modal-content-wrapper">
+            <button id="close-modal-btn" class="absolute top-3 right-4 text-3xl font-light text-gray-500 hover:text-gray-900">&times;</button>
+            <h3 id="modal-title" class="text-2xl font-bold mb-4 text-gray-900"></h3>
+            <div id="modal-body" class="text-gray-700 max-h-[60vh] overflow-y-auto pr-2">
+                <!-- Contenido de Gemini o Spinner -->
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        const quizData = [
+            // Las 20 preguntas originales van aquí...
+            { question: "¿Mediante qué ley se creó el Sistema Nacional Integrado de Salud (SNIS) en Uruguay?", options: ["Ley 18335", "Ley 18211", "Ley 19075", "Ley 18651"], correct: 1, justification: "La Ley 18.211, promulgada en 2007, es la que establece la creación del Sistema Nacional Integrado de Salud (SNIS), marcando un hito en la reforma sanitaria del país.", concept: "Creación del Sistema Nacional Integrado de Salud (SNIS)" },
+            { question: "¿Cuál de los siguientes es considerado un ATRIBUTO de la Atención Primaria de Salud (APS) y no un principio?", options: ["Equidad", "Integralidad", "Solidaridad", "Intersectorialidad"], correct: 1, justification: "La integralidad, junto con la accesibilidad, el primer contacto y la longitudinalidad, es uno de los atributos esenciales de la APS. La equidad, solidaridad e intersectorialidad son principios que la sustentan.", concept: "Atributos de la Atención Primaria de Salud (APS)" },
+            { question: "El Análisis de Situación de Salud (ASIS) es la primera etapa de un proceso más amplio. ¿Cuál es ese proceso?", options: ["Atención Primaria Orientada a la Comunidad (APOC)", "Carta de Ottawa", "Planificación Local de Salud (PLS)", "Prevención Cuaternaria"], correct: 2, justification: "El ASIS, que implica la recopilación de información sanitaria y ambiental, es el punto de partida fundamental para la Planificación Local de Salud (PLS), ya que permite identificar las necesidades reales de la comunidad.", concept: "Planificación Local de Salud (PLS) y ASIS" },
+            { question: "La declaración de 'Salud para todos en el año 2000' es el lema central de un documento histórico para la APS. ¿Cuál es?", options: ["La Carta de Ottawa", "El informe Lalonde", "La Declaración de Alma Ata", "La Ley de Creación del SNIS"], correct: 2, justification: "La Declaración de Alma Ata de 1978 es el documento fundacional que estableció la Atención Primaria de Salud como la estrategia clave para alcanzar la meta de 'Salud para todos en el año 2000'.", concept: "Declaración de Alma Ata" },
+            { question: "¿Cuál es la principal diferencia conceptual entre la APOC (Atención Primaria Orientada a la Comunidad) y el PLS (Planificación Local de Salud)?", options: ["La APOC es teórica y el PLS es práctico.", "La APOC es un modelo de atención y el PLS es una herramienta de planificación.", "La APOC se enfoca en el individuo y el PLS en la comunidad.", "No tienen diferencias significativas."], correct: 1, justification: "La APOC es un modelo integral que extiende la atención a nivel comunitario de forma continua, mientras que el PLS es una herramienta metodológica específica que se utiliza dentro de ese modelo (o de otros) para planificar acciones basadas en prioridades.", concept: "Diferencia entre APOC y PLS" },
+            { question: "El principio de la APS que aboga por la colaboración entre el sector salud y otros sectores (educación, vivienda, trabajo) se denomina:", options: ["Justicia social", "Sustentabilidad", "Participación comunitaria", "Intersectorialidad"], correct: 3, justification: "La intersectorialidad es el principio que reconoce que la salud es un fenómeno complejo influenciado por múltiples determinantes sociales, y por lo tanto, requiere la acción coordinada de diversos sectores para lograr mejoras efectivas.", concept: "Principio de Intersectorialidad en APS" },
+            { question: "En la etapa de 'Establecimiento de Prioridades' del PLS, se utilizan métodos como el grupo nominal o la parrilla de análisis. ¿Con qué propósito?", options: ["Para recopilar datos demográficos.", "Para ejecutar las actividades planificadas.", "Para evaluar el impacto final del plan.", "Para decidir qué problemas de salud abordar primero."], correct: 3, justification: "Estos métodos cualitativos son herramientas que ayudan al equipo de salud y a la comunidad a analizar los problemas identificados en el ASIS y a priorizar de manera consensuada cuáles son los más importantes o factibles de abordar.", concept: "Establecimiento de Prioridades en PLS" },
+            { question: "¿Cuál de las siguientes NO es una de las cinco áreas de acción propuestas por la Carta de Ottawa?", options: ["Creación de ambientes favorables", "Reforzamiento de la acción comunitaria", "Financiamiento de la investigación médica", "Elaboración de políticas públicas saludables"], correct: 2, justification: "La Carta de Ottawa (1986) define cinco áreas de acción: elaboración de políticas públicas saludables, creación de ambientes favorables, reforzamiento de la acción comunitaria, desarrollo de habilidades personales y reorientación de los servicios de salud. El financiamiento de la investigación no es una de sus áreas de acción directa.", concept: "Áreas de acción de la Carta de Ottawa" },
+            { question: "La Prevención Cuaternaria, desarrollada por Marc Jamoulle, tiene como objetivo principal:", options: ["Prevenir la aparición de enfermedades infecciosas.", "Evitar el daño causado por la intervención médica innecesaria.", "Promover la vacunación masiva.", "Detectar enfermedades en etapas tempranas."], correct: 1, justification: "La Prevención Cuaternaria se centra en la crítica reflexiva de la práctica médica para proteger a los pacientes de la medicalización excesiva y de intervenciones diagnósticas o terapéuticas que podrían causar más daño que beneficio, bajo el principio 'primum non nocere'.", concept: "Objetivo de la Prevención Cuaternaria" },
+            { question: "Según la OMS, la Promoción de la Salud es el proceso que permite a las personas:", options: ["Recibir tratamiento médico gratuito.", "Aumentar el control sobre su propia salud y mejorarla.", "Delegar las decisiones de salud en los profesionales.", "Cumplir estrictamente con las indicaciones médicas."], correct: 1, justification: "La definición central de la Promoción de la Salud se enfoca en el empoderamiento de las personas y comunidades para que tomen un rol activo en la gestión de los determinantes de su salud.", concept: "Definición de Promoción de la Salud (OMS)" },
+            { question: "La 'Abogacía por la Salud' (Health Advocacy) busca principalmente:", options: ["Lograr compromisos políticos y defender los derechos humanos en salud.", "Vender productos y servicios de salud.", "Realizar diagnósticos médicos a nivel comunitario.", "Educar sobre higiene personal exclusivamente."], correct: 0, justification: "La abogacía por la salud es una estrategia de promoción que combina acciones sociales e individuales para influir en las políticas públicas y asegurar que la salud sea una prioridad, defendiendo derechos como el acceso universal y la inclusión social.", concept: "Abogacía por la Salud" },
+            { question: "El principio ético 'primum non nocere' ('primero, no hacer daño') es el fundamento central de:", options: ["La Promoción de la Salud.", "La Educación para la Salud.", "La Prevención Cuaternaria.", "El Sistema Nacional Integrado de Salud."], correct: 2, justification: "Este principio hipocrático es la piedra angular de la Prevención Cuaternaria, que llama a los profesionales de la salud a ser cautelosos y a evitar intervenciones que puedan ser perjudiciales para el paciente.", concept: "Principio 'primum non nocere' y Prevención Cuaternaria" },
+            { question: "Reorientar los servicios de salud, una de las áreas de la Carta de Ottawa, implica un cambio de enfoque desde un modelo puramente curativo hacia uno que integre:", options: ["La tecnología de punta.", "La promoción de la salud y la prevención.", "La privatización de los servicios.", "La atención exclusiva en hospitales."], correct: 1, justification: "Reorientar los servicios de salud significa que el sistema sanitario debe ir más allá de la atención a la enfermedad y adoptar un enfoque más amplio que incluya activamente la promoción de la salud y la prevención de enfermedades, fortaleciendo la APS.", concept: "Reorientación de los servicios de salud" },
+            { question: "En el contexto de la Educación para la Salud, ¿qué caracteriza al modelo de 'educación popular' propuesto por Paulo Freire?", options: ["Una relación vertical donde el educador deposita conocimiento.", "Un diálogo horizontal donde todos enseñan y aprenden.", "El uso exclusivo de materiales audiovisuales.", "La memorización de conceptos sin reflexión."], correct: 1, justification: "A diferencia de la 'educación bancaria', la educación popular se basa en el diálogo, el respeto por el saber del otro y una relación horizontal, donde el conocimiento se construye de forma bidireccional entre educador y educando.", concept: "Modelo de Educación Popular" },
+            { question: "Según la teoría de grupos de Pichón Rivière, ¿qué rol cumple el 'portavoz'?", options: ["Es quien se opone a todas las ideas del grupo.", "Es el miembro sobre quien se depositan las culpas.", "Es quien enuncia algo que refleja el sentir latente del grupo.", "Es quien dirige y organiza formalmente la tarea."], correct: 2, justification: "El portavoz no habla solo por sí mismo, sino que su discurso, pregunta o inquietud vehiculiza un sentir o una problemática que es común a todo el grupo, aunque los demás no lo hayan verbalizado.", concept: "Rol del portavoz (Pichón Rivière)" },
+            { question: "Un 'Taller' es considerado una metodología de trabajo que aplica los principios de:", options: ["La educación bancaria.", "La prevención cuaternaria.", "La educación popular.", "La planificación burocrática."], correct: 2, justification: "El taller es la herramienta por excelencia de la educación popular. Se caracteriza por ser un espacio práctico, participativo y dialógico donde se aprende 'haciendo' y reflexionando sobre esa práctica.", concept: "El Taller como metodología de Educación Popular" },
+            { question: "Las técnicas participativas que involucran dramatizaciones o juegos de roles se clasifican, según Oscar Jara, como:", options: ["Técnicas visuales.", "Técnicas auditivas.", "Técnicas vivenciales (de actuación).", "Técnicas de análisis de datos."], correct: 2, justification: "Las técnicas vivenciales o de actuación son aquellas que implican que los participantes 'pongan el cuerpo' y experimenten una situación a través de la acción, como en una dramatización, lo que facilita una comprensión más profunda y emocional.", concept: "Técnicas vivenciales de Oscar Jara" },
+            { question: "En la dinámica de un grupo operativo, la etapa de 'Pre-tarea' se caracteriza por:", options: ["La ejecución exitosa de los objetivos.", "La planificación de proyectos futuros.", "La resistencia y las ansiedades que impiden abordar la tarea principal.", "La disolución final del grupo."], correct: 2, justification: "La pre-tarea es una fase inicial donde el grupo evita enfrentar la tarea central debido a miedos y ansiedades. Se manifiesta a través de divagaciones, chistes o discusiones sobre temas irrelevantes, como un mecanismo de defensa.", concept: "Etapa de Pre-tarea en grupos operativos" },
+            { question: "¿Cuál es la diferencia fundamental entre 'hábito' y 'estilo de vida'?", options: ["Son sinónimos exactos.", "Un hábito es un conjunto de estilos de vida.", "El estilo de vida es más amplio e incluye cultura y entorno; el hábito es una conducta aislada.", "El hábito es saludable y el estilo de vida no."], correct: 2, justification: "Un hábito es una conducta específica y repetitiva (ej: lavarse los dientes). El estilo de vida es un concepto mucho más amplio y complejo que engloba un conjunto de hábitos, valores, condiciones socioeconómicas, cultura y entorno que definen la forma de vivir de una persona.", concept: "Diferencia entre hábito y estilo de vida" },
+            { question: "En un grupo, el rol que asume las culpas y tensiones, permitiendo que el resto del grupo funcione sin conflictos aparentes, es el de:", options: ["Líder positivo", "Saboteador", "Portavoz", "Chivo expiatorio"], correct: 3, justification: "El 'chivo expiatorio' es el miembro sobre el cual el grupo deposita todos los aspectos negativos o problemáticos. Es un mecanismo grupal para lidiar con la ansiedad, aunque sea a costa de un individuo.", concept: "Rol del chivo expiatorio" }
+        ];
+
+        // --- Elementos del DOM ---
+        const questionText = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const feedbackArea = document.getElementById('feedback-area');
+        const justificationText = document.getElementById('justification-text');
+        const nextBtn = document.getElementById('next-btn');
+        const scoreArea = document.getElementById('score-area');
+        const finalScore = document.getElementById('final-score');
+        const restartBtn = document.getElementById('restart-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const scoreFeedback = document.getElementById('score-feedback');
+        const questionArea = document.getElementById('question-area');
+        const quizHeader = document.getElementById('quiz-header');
+        
+        // --- Elementos de IA y Modal ---
+        const explainMoreBtn = document.getElementById('explain-more-btn');
+        const generateQuestionBtn = document.getElementById('generate-question-btn');
+        const geminiModal = document.getElementById('gemini-modal');
+        const modalContentWrapper = document.getElementById('modal-content-wrapper');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+
+        // --- Estado del Quiz ---
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let shuffledQuestions = [];
+        const apiKey = ""; // Dejar vacío, se gestiona en el entorno de ejecución
+
+        // --- Funciones del Quiz ---
+        function startQuiz() {
+            shuffledQuestions = quizData.sort(() => Math.random() - 0.5);
+            currentQuestionIndex = 0;
+            score = 0;
+            scoreArea.classList.add('hidden');
+            questionArea.classList.remove('hidden');
+            quizHeader.classList.remove('hidden');
+            nextBtn.classList.add('hidden');
+            feedbackArea.classList.add('hidden');
+            displayQuestion();
+        }
+
+        function displayQuestion() {
+            feedbackArea.classList.add('hidden');
+            nextBtn.classList.add('hidden');
+            document.getElementById('user-justification').value = '';
+
+            const question = shuffledQuestions[currentQuestionIndex];
+            questionText.textContent = `${currentQuestionIndex + 1}. ${question.question}`;
+            optionsContainer.innerHTML = '';
+            
+            question.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.classList.add('btn-option', 'w-full', 'p-4', 'text-left', 'border-2', 'border-gray-300', 'rounded-lg', 'hover:bg-gray-100', 'hover:border-blue-400', 'focus:outline-none');
+                button.dataset.index = index;
+                button.addEventListener('click', selectAnswer);
+                optionsContainer.appendChild(button);
+            });
+
+            const progress = ((currentQuestionIndex) / shuffledQuestions.length) * 100;
+            progressBar.style.width = `${progress}%`;
+        }
+
+        function selectAnswer(e) {
+            const selectedButton = e.target;
+            const selectedIndex = parseInt(selectedButton.dataset.index);
+            const question = shuffledQuestions[currentQuestionIndex];
+
+            Array.from(optionsContainer.children).forEach(btn => {
+                btn.disabled = true;
+                btn.classList.remove('hover:bg-gray-100', 'hover:border-blue-400');
+            });
+
+            if (selectedIndex === question.correct) {
+                score++;
+                selectedButton.classList.add('correct');
+            } else {
+                selectedButton.classList.add('incorrect');
+                optionsContainer.children[question.correct].classList.add('correct');
+            }
+
+            justificationText.textContent = question.justification;
+            feedbackArea.classList.remove('hidden');
+            nextBtn.classList.remove('hidden');
+        }
+
+        function showNextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < shuffledQuestions.length) {
+                displayQuestion();
+            } else {
+                showFinalScore();
+            }
+        }
+
+        function showFinalScore() {
+            questionArea.classList.add('hidden');
+            feedbackArea.classList.add('hidden');
+            nextBtn.classList.add('hidden');
+            quizHeader.classList.add('hidden');
+            
+            scoreArea.classList.remove('hidden');
+            finalScore.textContent = `Total: ${score}/${shuffledQuestions.length}`;
+
+            const percentage = (score / shuffledQuestions.length) * 100;
+            if (percentage >= 80) {
+                scoreFeedback.textContent = "¡Excelente trabajo! Tienes un gran dominio de los temas.";
+            } else if (percentage >= 60) {
+                scoreFeedback.textContent = "¡Buen resultado! Sigue repasando para afianzar los conceptos.";
+            } else {
+                scoreFeedback.textContent = "Sigue estudiando. ¡La práctica hace al maestro!";
+            }
+        }
+
+        // --- Funciones de IA (Gemini) ---
+
+        function showLoading() {
+            modalBody.innerHTML = '<div class="flex justify-center items-center p-8"><div class="spinner"></div></div>';
+            geminiModal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContentWrapper.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function hideModal() {
+            modalContentWrapper.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                geminiModal.classList.add('hidden');
+            }, 200);
+        }
+
+        async function handleExplainMore() {
+            const question = shuffledQuestions[currentQuestionIndex];
+            modalTitle.textContent = `Profundizando en: ${question.concept}`;
+            showLoading();
+
+            const prompt = `Como un profesor universitario experto en salud pública, explica el siguiente concepto de forma clara y detallada para un estudiante. Concepto: "${question.concept}". La justificación básica es: "${question.justification}". Expande sobre esta justificación, añade contexto y ejemplos si es posible.`;
+            
+            try {
+                const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                const payload = { contents: chatHistory };
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error de API: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    modalBody.innerHTML = `<p class="whitespace-pre-wrap">${text}</p>`;
+                } else {
+                    throw new Error("Respuesta no válida de la API.");
+                }
+
+            } catch (error) {
+                console.error("Error al llamar a la API de Gemini:", error);
+                modalBody.innerHTML = `<p class="text-red-600">Lo siento, no se pudo obtener la explicación. Por favor, intenta de nuevo más tarde.</p>`;
+            }
+        }
+
+        async function handleGenerateQuestion() {
+            modalTitle.textContent = "Pregunta generada por IA";
+            showLoading();
+
+            const prompt = `Eres un profesor de la materia "AT1" de una universidad. Crea una nueva pregunta de opción múltiple (4 opciones, 1 correcta) sobre uno de los siguientes temas: Sistema Nacional Integrado de Salud (SNIS), Atención Primaria de Salud (APS), Planificación Local de Salud (PLS), Carta de Ottawa, Promoción de la Salud, Prevención Cuaternaria, Educación para la Salud, o Dinámicas Grupales. La pregunta debe ser de nivel universitario y similar en estilo a las existentes.`;
+            
+            const schema = {
+                type: "OBJECT",
+                properties: {
+                    question: { type: "STRING" },
+                    options: {
+                        type: "ARRAY",
+                        items: { type: "STRING" }
+                    },
+                    correct: { type: "INTEGER" },
+                    justification: { type: "STRING" }
+                },
+                required: ["question", "options", "correct", "justification"]
+            };
+
+            try {
+                const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+                const payload = {
+                    contents: chatHistory,
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: schema
+                    }
+                };
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error de API: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                const jsonText = result.candidates[0].content.parts[0].text;
+                const newQuestion = JSON.parse(jsonText);
+                displayGeneratedQuestion(newQuestion);
+
+            } catch (error) {
+                console.error("Error al llamar a la API de Gemini:", error);
+                modalBody.innerHTML = `<p class="text-red-600">Lo siento, no se pudo generar una nueva pregunta. Por favor, intenta de nuevo más tarde.</p>`;
+            }
+        }
+
+        function displayGeneratedQuestion(q) {
+            modalBody.innerHTML = `
+                <h4 class="text-lg font-semibold mb-4">${q.question}</h4>
+                <div id="generated-options" class="space-y-3"></div>
+                <div id="generated-feedback" class="mt-4 hidden p-3 rounded-lg"></div>
+            `;
+            const genOptionsContainer = document.getElementById('generated-options');
+            q.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.classList.add('btn-option', 'w-full', 'p-3', 'text-left', 'border-2', 'border-gray-300', 'rounded-lg', 'hover:bg-gray-100');
+                button.addEventListener('click', () => {
+                    const feedbackEl = document.getElementById('generated-feedback');
+                    Array.from(genOptionsContainer.children).forEach(btn => btn.disabled = true);
+                    
+                    if(index === q.correct) {
+                        button.classList.add('correct');
+                        feedbackEl.classList.add('bg-green-100', 'text-green-800');
+                        feedbackEl.innerHTML = `<b>¡Correcto!</b><br>${q.justification}`;
+                    } else {
+                        button.classList.add('incorrect');
+                        genOptionsContainer.children[q.correct].classList.add('correct');
+                        feedbackEl.classList.add('bg-red-100', 'text-red-800');
+                        feedbackEl.innerHTML = `<b>Incorrecto.</b><br>${q.justification}`;
+                    }
+                    feedbackEl.classList.remove('hidden');
+                });
+                genOptionsContainer.appendChild(button);
+            });
+        }
+
+
+        // --- Event Listeners ---
+        nextBtn.addEventListener('click', showNextQuestion);
+        restartBtn.addEventListener('click', startQuiz);
+        explainMoreBtn.addEventListener('click', handleExplainMore);
+        generateQuestionBtn.addEventListener('click', handleGenerateQuestion);
+        closeModalBtn.addEventListener('click', hideModal);
+        geminiModal.addEventListener('click', (e) => {
+            if (e.target.id === 'gemini-modal') {
+                hideModal();
+            }
+        });
+
+
+        // --- Iniciar el Quiz ---
+        startQuiz();
+
+    </script>
+</body>
+</html>
